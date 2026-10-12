@@ -1,0 +1,16 @@
+FROM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
+
+WORKDIR /src
+RUN apk add --no-cache ca-certificates
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o /bridgewatch ./cmd/bridgewatch
+
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /bridgewatch /bridgewatch
+USER 65532:65532
+ENV BRIDGEWATCH_LISTEN_ADDR=:8080
+EXPOSE 8080
+ENTRYPOINT ["/bridgewatch"]
